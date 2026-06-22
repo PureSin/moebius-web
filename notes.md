@@ -71,6 +71,37 @@ Running log of what I figure out. Newest at the bottom of each section.
   - vae_decoder: (B,4,64,64) → (B,3,512,512).
 - scaling_factor = 0.13025 applied in JS (encode: latent*sf; decode: latent/sf).
 
+## Phase 2 results (ONNX export — DONE)
+- torch.onnx.export (legacy tracer, opset 18) traced all 3 graphs cleanly. No op-coverage
+  failures. The einsum/lambda/Conv3d ops all exported.
+- Parity vs PyTorch (CPU EP): decoder 5.7e-5, unet 3.6e-6, encoder mean ch ~2e-2.
+- FULL pipeline parity test (python/onnx_pipeline.py): reimplemented DDIM+CFG+9ch+scaling
+  in numpy on the ONNX sessions, vs torch models with identical noise:
+    final latents max|Δ| 0.149, decoded image mean|Δ| 0.0022, max 0.090 → visually identical.
+  This validates the ENTIRE orchestration I'll port to TS.
+- numpy DDIM vs diffusers DDIMScheduler: step max|Δ| 5e-7, timesteps identical. ✓
+
+## DDIM constants for JS (validated)
+- betas = linspace(sqrt(0.00085), sqrt(0.012), 1000)^2 ; alphas_cumprod = cumprod(1-betas)
+- timesteps(20 steps) = [950,900,...,50,0]; strength 0.99 ⇒ drop first ⇒ [900,...,0] (19).
+- ddim_step (eta=0, clip_sample=False):
+    pred_x0 = (sample - sqrt(1-ac_t)*eps) / sqrt(ac_t)
+    prev    = sqrt(ac_prev)*pred_x0 + sqrt(1-ac_prev)*eps
+    ac_prev = alphas_cumprod[prev_t], or final_alpha_cumprod=1.0 when prev_t<0 (last step).
+- noise_offset 0.0357: noise += 0.0357 * randn(B,4,1,1). (optional; small)
+
+## Web pipeline recipe (numpy → TS)
+1. resize image+mask to 512×512 (mask NEAREST, binarize ≥128).
+2. img→[-1,1] CHW; masked = img*(1-mask).
+3. encode img & masked → moments; take mean[:4] * 0.13025.
+4. mask→64×64 NEAREST, 1ch.
+5. latents = randn(1,4,64,64) [+ noise_offset].
+6. loop t in timesteps: nine=cat([latents,mask64,maskedLat]); batch×2; unet;
+   cfg = u + g*(c-u); latents = ddim_step.
+7. decode(latents/0.13025); (x+1)/2; clip; → image.
+8. paste: out*blur(mask) + (1-blur(mask))*orig.
+
 ## TODO / unknowns
-- ORT-Web WebGPU coverage for einsum / GroupNorm / Conv3d (pos_conv!) — Conv3d may be a
-  problem on WebGPU; watch for CPU fallback.
+- Verify ORT-Web WebGPU actually runs these ops on GPU (not silent CPU fallback),
+  esp. einsum / GroupNorm / Conv3d (pos_conv). Conv3d is the riskiest on WebGPU.
+- UNet fp32 = 907MB download. Consider fp16 export to ~450MB (precision risk in λ layers).
