@@ -101,7 +101,32 @@ Running log of what I figure out. Newest at the bottom of each section.
 7. decode(latents/0.13025); (x+1)/2; clip; → image.
 8. paste: out*blur(mask) + (1-blur(mask))*orig.
 
+## Phase 3 (web app) — in progress
+- Vite + TS + onnxruntime-web (1.27.0). Default `onnxruntime-web/webgpu` import resolves
+  to the self-contained `ort.webgpu.bundle.min.mjs`.
+- Models served LOCALLY: web/public/models -> ../models symlink, at /models/*.onnx.
+  Total ~1.24GB fetched over localhost (no internet). ORT runtime served from
+  web/ort-dist at /ort/* via a custom static middleware (see vite.config.ts).
+- BUG FIXED: ORT glue .mjs must NOT be in /public (Vite tries to module-transform it).
+  Fix = serve /ort/* as raw static files via configureServer middleware.
+- COOP/COEP headers set (needed for threaded WASM / SharedArrayBuffer).
+
+## WebGPU op coverage (confirmed from ORT source at /tmp/Moebius/onnxruntime)
+- js/web/lib/wasm/jsep/webgpu/op-resolve-rules.ts registers: Einsum ✓, Conv ✓
+  (conv.ts has computeConv3DInfo / createConv3DNaiveProgramInfo → Conv3d pos_conv works,
+  naive kernel so possibly slow), InstanceNormalization ✓, MatMul/Gemm ✓, Softmax ✓,
+  Reduce* ✓, Transpose/Concat/Gather/Pad/Resize/Where ✓.
+- GroupNorm: not registered by that name, BUT torch.onnx exports nn.GroupNorm as a
+  Reshape→InstanceNormalization→Reshape→Mul→Add decomposition → covered. (VAE decoder
+  CPU-EP parity was 5.7e-5, so the graph is decomposed, not a single GroupNorm op.)
+- ⇒ No expected silent CPU fallback for the heavy ops. Confirm empirically in console.
+
+## Verification without a GPU browser (sandbox can't drive Chrome — user's live Chrome
+## holds the playwright profile)
+- web/test/fixture/*.bin: dumped inputs + reference final latents from the validated
+  numpy/ONNX pipeline, to check the TS port (ddim.ts + 9ch assembly) in Node.
+
 ## TODO / unknowns
-- Verify ORT-Web WebGPU actually runs these ops on GPU (not silent CPU fallback),
-  esp. einsum / GroupNorm / Conv3d (pos_conv). Conv3d is the riskiest on WebGPU.
-- UNet fp32 = 907MB download. Consider fp16 export to ~450MB (precision risk in λ layers).
+- fp16 export to ~450MB UNet for real deployment (VAE fp16 unstable: decoder Cast issue;
+  keep VAE fp32). Quality risk in λ layers — validate before shipping fp16.
+- Confirm in-browser: WebGPU selected, no CPU fallback, end-to-end correctness + timing.
