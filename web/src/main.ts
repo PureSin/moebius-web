@@ -18,8 +18,7 @@ const mctx = maskCanvas.getContext("2d")!;
 
 let hasImage = false;
 let fitRect: Fitted["rect"] | null = null; // content rect inside the 512 letterbox
-let pipeline: MoebiusPipeline | null = null;
-let loadingModels = false;
+let loadPromise: Promise<MoebiusPipeline | null> | null = null;
 
 // ---------- mask painting ----------
 let painting = false;
@@ -90,21 +89,26 @@ $("sample").addEventListener("click", () => {
 const MODEL_BASE = import.meta.env.VITE_MODEL_BASE ?? `${import.meta.env.BASE_URL}models`;
 const ORT_BASE = import.meta.env.VITE_ORT_BASE ?? `${import.meta.env.BASE_URL}ort/`;
 
-async function ensureModels() {
-  if (pipeline || loadingModels) return;
-  loadingModels = true;
-  MoebiusPipeline.configureRuntime(ORT_BASE);
-  pipeline = new MoebiusPipeline();
-  try {
-    await pipeline.load(MODEL_BASE, (stage) => (statusEl.textContent = stage + "…"));
-    backendEl.textContent = `Runtime: ONNX Runtime Web · ${pipeline.backend.toUpperCase()}`;
-    statusEl.textContent = "Models ready.";
-  } catch (err) {
-    statusEl.textContent = "Model load failed: " + (err as Error).message;
-    pipeline = null;
-  } finally {
-    loadingModels = false;
-  }
+// Returns a shared promise that resolves only once the ONNX sessions are actually loaded.
+// Concurrent callers (background prefetch + Run click) await the same promise, so Run never
+// races ahead of session creation.
+function ensureModels(): Promise<MoebiusPipeline | null> {
+  if (loadPromise) return loadPromise;
+  loadPromise = (async () => {
+    MoebiusPipeline.configureRuntime(ORT_BASE);
+    const p = new MoebiusPipeline();
+    try {
+      await p.load(MODEL_BASE, (stage) => (statusEl.textContent = stage + "…"));
+      backendEl.textContent = `Runtime: ONNX Runtime Web · ${p.backend.toUpperCase()}`;
+      statusEl.textContent = "Models ready.";
+      return p;
+    } catch (err) {
+      statusEl.textContent = "Model load failed: " + (err as Error).message;
+      loadPromise = null; // allow a retry on next click
+      return null;
+    }
+  })();
+  return loadPromise;
 }
 
 function maybeEnableRun() {
@@ -122,14 +126,14 @@ $<HTMLInputElement>("cfg").addEventListener("input", (e) => {
 runBtn.addEventListener("click", async () => {
   if (!hasImage) return;
   runBtn.disabled = true;
-  await ensureModels();
-  if (!pipeline) {
+  const pipe = await ensureModels();
+  if (!pipe) {
     runBtn.disabled = false;
     return;
   }
   const t0 = performance.now();
   try {
-    const out = await pipeline.run(imageCanvas, maskCanvas, {
+    const out = await pipe.run(imageCanvas, maskCanvas, {
       steps: +$<HTMLInputElement>("steps").value,
       guidance: +$<HTMLInputElement>("cfg").value,
       seed: +$<HTMLInputElement>("seed").value,
