@@ -78,7 +78,7 @@ $("sample").addEventListener("click", () => {
   img.crossOrigin = "anonymous";
   img.onload = () => setImage(img);
   img.onerror = () => (statusEl.textContent = "Could not load sample image.");
-  img.src = "/sample.png";
+  img.src = `${import.meta.env.BASE_URL}sample.png`;
 });
 
 // ---------- model loading ----------
