@@ -23,6 +23,6 @@ reference_out/
 # web app
 web/node_modules/
 web/dist/
-web/public/ort/
+web/ort-dist/
 web/public/models
 web/public/sample.png
