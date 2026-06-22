@@ -13,7 +13,8 @@ dist/
 *.onnx_data
 *.bin
 *.safetensors
-models/
+models/*
+!models/README.md
 weights/
 
 # Repro / scratch
@@ -23,6 +24,6 @@ reference_out/
 # web app
 web/node_modules/
 web/dist/
-web/ort-dist/
 web/public/models
-web/public/sample.png
+# NOTE: web/public/sample.png IS tracked — it ships with the demo.
+# NOTE: web/test/fixture/*.bin are validation fixtures, kept out via *.bin above.
