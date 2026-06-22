@@ -30,8 +30,9 @@ export function makeDDIM(numSteps: number, strength = 0.99): DDIM {
   for (let i = 0; i < numSteps; i++) ts.push(Math.round(i * stepRatio));
   ts.reverse(); // [950, 900, ..., 0]
 
-  // strength<1 drops the first init_timestep: t_start = numSteps - min(round(numSteps*strength), numSteps)
-  const initTimestep = Math.min(Math.round(numSteps * strength), numSteps);
+  // strength<1 drops the first init_timestep. NOTE: Python uses int() = truncation
+  // (int(20*0.99)=19), NOT rounding — must use Math.floor here to match.
+  const initTimestep = Math.min(Math.floor(numSteps * strength), numSteps);
   const tStart = Math.max(numSteps - initTimestep, 0);
   const timesteps = ts.slice(tStart);
 

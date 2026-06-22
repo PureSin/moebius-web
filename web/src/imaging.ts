@@ -30,15 +30,34 @@ export function randn(n: number, seed: number): Float32Array {
   return out;
 }
 
-// Draw a source image scaled into a 512x512 canvas, return that canvas.
-export function toSquareCanvas(src: CanvasImageSource): HTMLCanvasElement {
+// Draw a source image into a 512x512 canvas, LETTERBOXED (contain, no distortion).
+// Non-square inputs get black bars top/bottom or left/right. Returns the canvas plus
+// the content rect so we can crop the result back to the original aspect ratio.
+export interface Fitted {
+  canvas: HTMLCanvasElement;
+  rect: { x: number; y: number; w: number; h: number };
+}
+
+export function toSquareCanvas(
+  src: CanvasImageSource,
+  srcW: number,
+  srcH: number,
+): Fitted {
   const c = document.createElement("canvas");
   c.width = IMG;
   c.height = IMG;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(src, 0, 0, IMG, IMG);
-  return c;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, IMG, IMG);
+
+  const scale = Math.min(IMG / srcW, IMG / srcH);
+  const w = Math.round(srcW * scale);
+  const h = Math.round(srcH * scale);
+  const x = Math.floor((IMG - w) / 2);
+  const y = Math.floor((IMG - h) / 2);
+  ctx.drawImage(src, x, y, w, h);
+  return { canvas: c, rect: { x, y, w, h } };
 }
 
 // RGB image canvas -> CHW Float32Array in [-1, 1]. (1,3,512,512)

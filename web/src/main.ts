@@ -1,5 +1,5 @@
 import { MoebiusPipeline } from "./pipeline.ts";
-import { IMG, toSquareCanvas } from "./imaging.ts";
+import { IMG, toSquareCanvas, type Fitted } from "./imaging.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -17,6 +17,7 @@ const ictx = imageCanvas.getContext("2d")!;
 const mctx = maskCanvas.getContext("2d")!;
 
 let hasImage = false;
+let fitRect: Fitted["rect"] | null = null; // content rect inside the 512 letterbox
 let pipeline: MoebiusPipeline | null = null;
 let loadingModels = false;
 
@@ -54,9 +55,11 @@ maskCanvas.addEventListener("pointerup", () => (painting = false));
 $("clear-mask").addEventListener("click", () => mctx.clearRect(0, 0, IMG, IMG));
 
 // ---------- image loading ----------
-function setImage(src: CanvasImageSource) {
-  const sq = toSquareCanvas(src);
-  ictx.drawImage(sq, 0, 0);
+function setImage(img: HTMLImageElement) {
+  const fitted = toSquareCanvas(img, img.naturalWidth, img.naturalHeight);
+  fitRect = fitted.rect;
+  ictx.clearRect(0, 0, IMG, IMG);
+  ictx.drawImage(fitted.canvas, 0, 0);
   mctx.clearRect(0, 0, IMG, IMG);
   hasImage = true;
   maybeEnableRun();
@@ -133,7 +136,18 @@ runBtn.addEventListener("click", async () => {
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     statusEl.textContent = `Done in ${secs}s`;
     bar.style.width = "100%";
-    downloadLink.href = resultCanvas.toDataURL("image/png");
+    // crop the 512 letterbox back to the original aspect ratio for download
+    let dlCanvas: HTMLCanvasElement = resultCanvas;
+    if (fitRect && (fitRect.w !== IMG || fitRect.h !== IMG)) {
+      const crop = document.createElement("canvas");
+      crop.width = fitRect.w;
+      crop.height = fitRect.h;
+      crop
+        .getContext("2d")!
+        .drawImage(resultCanvas, fitRect.x, fitRect.y, fitRect.w, fitRect.h, 0, 0, fitRect.w, fitRect.h);
+      dlCanvas = crop;
+    }
+    downloadLink.href = dlCanvas.toDataURL("image/png");
     downloadLink.download = "moebius-inpaint.png";
     downloadLink.style.display = "inline-block";
   } catch (err) {
