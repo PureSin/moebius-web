@@ -1,0 +1,21 @@
+# Python / env
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Large model artifacts (kept out of git)
+*.onnx
+*.onnx_data
+*.bin
+*.safetensors
+models/
+weights/
+
+# Repro / scratch
+reference_out/
+.DS_Store
