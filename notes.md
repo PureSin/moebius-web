@@ -54,6 +54,23 @@ Running log of what I figure out. Newest at the bottom of each section.
 - DDIM `scale_model_input` is identity → skip in TS. Need to reproduce DDIM alphas/betas
   (scaled_linear, beta 0.00085→0.012, 1000 steps) and the DDIM step update in JS.
 
+## Architecture: spatial size is FIXED (important!)
+- Self-attn (attn1): MQSλ with `r=15` → local-context path (Conv3d pos_conv). Spatially
+  dynamic, fine at any size.
+- Cross-attn (attn2): MQCλ with NO `r` → global path → `rel_pos_emb` is an
+  `nn.Parameter(n*n, m, dim_k, dim_u)` where n = per-block sample_size, m = 10. This is
+  TIED to the trained spatial resolution. Different spatial size → wrong/oob indexing.
+- ⇒ Export at STATIC 512×512 image (64×64 latent). Web app resizes user input to 512×512,
+  inpaints, resizes result back + pastes. Square only. This is the benchmark resolution.
+
+## ONNX export plan
+- Three graphs, spatial static, batch dynamic where cheap:
+  - vae_encoder: (B,3,512,512) → moments (B,8,64,64); JS uses mean=moments[:,:4]*sf.
+  - unet (RemovalModel): (B,9,64,64), timesteps(B,), input_ids(B,10) → noise(B,4,64,64).
+    Embedding (nn.Embedding 20×3072) stays IN the graph (cheap gather). CFG batches B=2.
+  - vae_decoder: (B,4,64,64) → (B,3,512,512).
+- scaling_factor = 0.13025 applied in JS (encode: latent*sf; decode: latent/sf).
+
 ## TODO / unknowns
-- ONNX export of UNet (main risk) + VAE enc/dec.
-- ORT-Web WebGPU coverage for einsum / GroupNorm.
+- ORT-Web WebGPU coverage for einsum / GroupNorm / Conv3d (pos_conv!) — Conv3d may be a
+  problem on WebGPU; watch for CPU fallback.
