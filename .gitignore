@@ -27,3 +27,6 @@ web/dist/
 web/public/models
 # NOTE: web/public/sample.png IS tracked — it ships with the demo.
 # NOTE: web/test/fixture/*.bin are validation fixtures, kept out via *.bin above.
+
+# local preview server mount (absolute symlink)
+web/_serve/
