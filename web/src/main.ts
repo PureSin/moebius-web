@@ -82,13 +82,21 @@ $("sample").addEventListener("click", () => {
 });
 
 // ---------- model loading ----------
+// Configurable so the production build can point at a Hugging Face model repo while
+// local dev uses the on-disk symlink. Set VITE_MODEL_BASE / VITE_ORT_BASE at build time.
+// Defaults derive from Vite's BASE_URL so the app works at root (dev, HF Space) or under
+// a subpath (GitHub Pages project site, base "/<repo>/"). VITE_MODEL_BASE typically points
+// at an absolute Hugging Face model-repo URL for deployment.
+const MODEL_BASE = import.meta.env.VITE_MODEL_BASE ?? `${import.meta.env.BASE_URL}models`;
+const ORT_BASE = import.meta.env.VITE_ORT_BASE ?? `${import.meta.env.BASE_URL}ort/`;
+
 async function ensureModels() {
   if (pipeline || loadingModels) return;
   loadingModels = true;
-  MoebiusPipeline.configureRuntime("/ort/");
+  MoebiusPipeline.configureRuntime(ORT_BASE);
   pipeline = new MoebiusPipeline();
   try {
-    await pipeline.load("/models", (stage) => (statusEl.textContent = stage + "…"));
+    await pipeline.load(MODEL_BASE, (stage) => (statusEl.textContent = stage + "…"));
     backendEl.textContent = `Runtime: ONNX Runtime Web · ${pipeline.backend.toUpperCase()}`;
     statusEl.textContent = "Models ready.";
   } catch (err) {

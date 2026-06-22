@@ -36,7 +36,12 @@ export class MoebiusPipeline {
 
   static configureRuntime(wasmPaths: string) {
     ort.env.wasm.wasmPaths = wasmPaths;
-    ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8);
+    // Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin isolation
+    // (COOP/COEP). On hosts without it (e.g. a plain static HF Space) fall back to a
+    // single thread — the WebGPU path doesn't need threads anyway.
+    ort.env.wasm.numThreads = self.crossOriginIsolated
+      ? Math.min(navigator.hardwareConcurrency || 4, 8)
+      : 1;
   }
 
   async load(modelBase: string, onProgress?: Progress) {
