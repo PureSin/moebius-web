@@ -7,6 +7,8 @@ In-browser image inpainting with the [Moebius](https://github.com/hustvl/Moebius
 - **Live demo:** https://simonw.github.io/moebius-web/
 - **Model weights (ONNX):** https://huggingface.co/simonw/Moebius-ONNX
 
+Ported to ONNX by Claude Opus 4.8. [Full Claude Code transcript](https://gisthost.github.io/?58039ba5c1ca3ed177e8659168996ee4).
+
 Paint over a region of an image to replace it; the denoising loop runs locally on your GPU.
 The first run downloads ~1.27 GB of weights from Hugging Face (then browser-cached). A
 WebGPU-capable browser (recent Chrome or Safari) is required.
