@@ -1,6 +1,6 @@
 # Notes / lab log
 
-Running log of what I figure out. Newest at the bottom of each section.
+Running log of what Claude Opus 4.8 in Claude Code figured out. Newest at the bottom of each section.
 
 ## Environment
 - macOS (darwin arm64), Apple Silicon. No CUDA → torch CPU/MPS build.
