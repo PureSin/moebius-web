@@ -27,6 +27,8 @@ export interface RunOptions {
   seed: number;
   paste: boolean;
   onProgress?: Progress;
+  onStep?: (img: ImageData) => void;
+  livePreview?: () => boolean;
 }
 
 export class MoebiusPipeline {
@@ -139,7 +141,7 @@ export class MoebiusPipeline {
     maskCanvas: HTMLCanvasElement,
     opts: RunOptions,
   ): Promise<HTMLCanvasElement> {
-    const { steps, guidance, seed, paste, onProgress } = opts;
+    const { steps, guidance, seed, paste, onProgress, onStep, livePreview } = opts;
     const ddim = makeDDIM(steps);
 
     onProgress?.("Encoding image");
@@ -166,8 +168,12 @@ export class MoebiusPipeline {
       onProgress?.("Denoising", i + 1, tl.length);
       const eps = await this.unetCFG(latents, mask64, maskedLat, t, guidance);
       latents = ddimStep(eps, latents, t, prevT, ddim);
-      // yield to UI
-      await new Promise((r) => setTimeout(r, 0));
+      if (onStep && livePreview?.()) {
+        onStep(await this.decode(latents));
+      } else {
+        // yield to UI so progress bar can repaint
+        await new Promise((r) => setTimeout(r, 0));
+      }
     }
 
     onProgress?.("Decoding");
