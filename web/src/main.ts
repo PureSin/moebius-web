@@ -161,8 +161,8 @@ runBtn.addEventListener("click", async () => {
       paste: $<HTMLInputElement>("paste").checked,
       onProgress: setProgress,
       livePreview: () => $<HTMLInputElement>("live-preview").checked,
-      onStep: (img) => {
-        resultCanvas.getContext("2d")!.putImageData(img, 0, 0);
+      onStep: (canvas) => {
+        resultCanvas.getContext("2d")!.drawImage(canvas, 0, 0);
         resultPlaceholder.style.display = "none";
       },
     });
